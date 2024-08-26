@@ -2,6 +2,7 @@
 
 from vm_translator_constants import CommandType
 import vm_parser
+import os
 
 class CodeWriter:
     asm_file = None
@@ -42,13 +43,241 @@ class CodeWriter:
         file.write("M=M+1\n")
 
     @staticmethod
+    def process_push_norm_mem_seg(arg1, arg2):
+        """
+        pseudocode:
+
+        addr = segmentptr + i
+        *SP = *addr
+        SP++
+        """
+        file = CodeWriter.asm_fd
+        file.write("// push "+ arg1 + " "  + arg2 + "\n")
+        file.write("@" + arg2 + "\n");
+        file.write("D=A\n")
+        if arg1 == "local":
+            file.write("@LCL\n")
+        elif arg1 == "argument":
+            file.write("@ARG\n")
+        elif arg1 == "this":
+            file.write("@THIS\n")
+        elif arg1 == "that":
+            file.write("@THAT\n")
+        else:
+            print("Received invalid memory segment. Please check implementation!")
+            assert(False)
+        file.write("A=M+D\n")
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+
+    @staticmethod
+    def process_push_temp(arg):
+        """
+        pseudocode:
+
+        addr = 5 + i
+        *SP = *addr
+        SP++
+        """
+        file = CodeWriter.asm_fd
+        file.write("// push temp " + arg + "\n")
+        file.write("@" + arg + "\n");
+        file.write("D=A\n")
+        file.write("@5\n")
+        file.write("D=D+A\n")
+        file.write("A=D\n")
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+
+    @staticmethod
+    def process_push_static(arg):
+        """
+        pseudocode:
+
+        D = variable with name "Foo.arg" where Foo is name of file
+        *SP = D
+        SP++
+        """
+        file = CodeWriter.asm_fd
+        file.write("// push static " + arg + "\n")
+        name = os.path.basename(CodeWriter.asm_file).split('.')[0]
+        file.write("@" + name + "." + arg + "\n");
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+
+    @staticmethod
+    def process_push_pointer(arg):
+        """
+        pseudocode:
+
+        *SP = THIS/THAT
+        SP++
+        """
+        file = CodeWriter.asm_fd
+        file.write("// push pointer " + arg + "\n")
+        if arg == "0":
+            file.write("@THIS\n")
+        elif arg == "1":
+            file.write("@THAT\n")
+        else:
+            print("Invalid pointer arg\n")
+            assert(False)
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+
+    @staticmethod
+    def process_pop_norm_mem_seg(arg1, arg2):
+        """
+        pseudocode:
+
+        addr = segmentptr + i
+        SP--
+        *addr = *SP
+        """
+        file = CodeWriter.asm_fd
+        file.write("// pop "+ arg1 + " "  + arg2 + "\n")
+
+        file.write("@" + arg2 + "\n");
+        file.write("D=A\n")
+        if arg1 == "local":
+            file.write("@LCL\n")
+        elif arg1 == "argument":
+            file.write("@ARG\n")
+        elif arg1 == "this":
+            file.write("@THIS\n")
+        elif arg1 == "that":
+            file.write("@THAT\n")
+        else:
+            print("Received invalid memory segment. Please check implementation!")
+            assert(False)
+        file.write("A=M+D\n")
+        file.write("D=A\n")
+        file.write("@13\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M-1\n")
+        file.write("A=M\n")
+        file.write("D=M\n")
+        file.write("@13\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+
+    @staticmethod
+    def process_pop_temp(arg):
+        """
+        pseudocode:
+
+        addr = 5 + i
+        SP--
+        *addr = *SP
+        """
+        file = CodeWriter.asm_fd
+        file.write("// pop temp " + arg + "\n")
+        file.write("@" + arg + "\n");
+        file.write("D=A\n")
+        file.write("@5\n")
+        file.write("D=D+A\n")
+        file.write("@13\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M-1\n")
+        file.write("A=M\n")
+        file.write("D=M\n")
+        file.write("@13\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+
+    @staticmethod
+    def process_pop_static(arg):
+        """
+        pseudocode:
+
+        SP--
+        D=*SP
+        variable with name "Foo.arg" where Foo is name of file = D
+        """
+        file = CodeWriter.asm_fd
+        file.write("// pop static " + arg + "\n")
+        name = os.path.basename(CodeWriter.asm_file).split('.')[0]
+        file.write("@SP\n")
+        file.write("M=M-1\n")
+        file.write("A=M\n")
+        file.write("D=M\n")
+        file.write("@" + name + "." + arg + "\n");
+        file.write("M=D\n")
+
+    @staticmethod
+    def process_pop_pointer(arg):
+        """
+        pseudocode:
+
+        SP--
+        THIS/THAT = *SP
+        """
+        file = CodeWriter.asm_fd
+        file.write("// pop pointer " + arg + "\n")
+        file.write("@SP\n")
+        file.write("M=M-1\n")
+        file.write("A=M\n")
+        file.write("D=M\n")
+
+        if arg == "0":
+            file.write("@THIS\n")
+        elif arg == "1":
+            file.write("@THAT\n")
+        else:
+            print("Invalid pointer arg\n")
+            assert(False)
+        file.write("M=D\n")
+
+    @staticmethod
     def process_push(arg1, arg2):
         if arg1 == "constant":
             CodeWriter.process_push_constant(arg2)
+        elif arg1 == "local" or arg1 == "argument" or arg1 == "this" or arg1 == "that":
+            CodeWriter.process_push_norm_mem_seg(arg1, arg2)
+        elif arg1 == "temp":
+            CodeWriter.process_push_temp(arg2)
+        elif arg1 == "static":
+            CodeWriter.process_push_static(arg2)
+        elif arg1 == "pointer":
+            CodeWriter.process_push_pointer(arg2)
+        else:
+            print("Invalid push command\n")
+            assert(False)
 
     @staticmethod
     def process_pop(arg1, arg2):
-        pass
+        if arg1 == "constant":
+            print("Received invalid pop constant command")
+            assert(False)
+        elif arg1 == "local" or arg1 == "argument" or arg1 == "this" or arg1 == "that":
+            CodeWriter.process_pop_norm_mem_seg(arg1, arg2)
+        elif arg1 == "temp":
+            CodeWriter.process_pop_temp(arg2)
+        elif arg1 == "static":
+            CodeWriter.process_pop_static(arg2)
+        elif arg1 == "pointer":
+            CodeWriter.process_pop_pointer(arg2)
+        else:
+            print("Invalid pop command\n")
+            assert(False)
 
     @staticmethod
     def process_add():
