@@ -98,7 +98,7 @@ class CodeWriter:
         file.write("M=M+1\n")
 
     @staticmethod
-    def process_push_static(arg):
+    def process_push_static(arg, vm_fname):
         """
         pseudocode:
 
@@ -108,7 +108,7 @@ class CodeWriter:
         """
         file = CodeWriter.asm_fd
         file.write("// push static " + arg + "\n")
-        name = os.path.basename(CodeWriter.asm_file).split('.')[0]
+        name = os.path.basename(vm_fname).split('.')[0]
         file.write("@" + name + "." + arg + "\n");
         file.write("D=M\n")
         file.write("@SP\n")
@@ -204,7 +204,7 @@ class CodeWriter:
         file.write("M=D\n")
 
     @staticmethod
-    def process_pop_static(arg):
+    def process_pop_static(arg, vm_fname):
         """
         pseudocode:
 
@@ -214,7 +214,7 @@ class CodeWriter:
         """
         file = CodeWriter.asm_fd
         file.write("// pop static " + arg + "\n")
-        name = os.path.basename(CodeWriter.asm_file).split('.')[0]
+        name = os.path.basename(vm_fname).split('.')[0]
         file.write("@SP\n")
         file.write("M=M-1\n")
         file.write("A=M\n")
@@ -247,7 +247,7 @@ class CodeWriter:
         file.write("M=D\n")
 
     @staticmethod
-    def process_push(arg1, arg2):
+    def process_push(arg1, arg2, vm_fname):
         if arg1 == "constant":
             CodeWriter.process_push_constant(arg2)
         elif arg1 == "local" or arg1 == "argument" or arg1 == "this" or arg1 == "that":
@@ -255,7 +255,7 @@ class CodeWriter:
         elif arg1 == "temp":
             CodeWriter.process_push_temp(arg2)
         elif arg1 == "static":
-            CodeWriter.process_push_static(arg2)
+            CodeWriter.process_push_static(arg2, vm_fname)
         elif arg1 == "pointer":
             CodeWriter.process_push_pointer(arg2)
         else:
@@ -263,7 +263,7 @@ class CodeWriter:
             assert(False)
 
     @staticmethod
-    def process_pop(arg1, arg2):
+    def process_pop(arg1, arg2, vm_fname):
         if arg1 == "constant":
             print("Received invalid pop constant command")
             assert(False)
@@ -272,7 +272,7 @@ class CodeWriter:
         elif arg1 == "temp":
             CodeWriter.process_pop_temp(arg2)
         elif arg1 == "static":
-            CodeWriter.process_pop_static(arg2)
+            CodeWriter.process_pop_static(arg2, vm_fname)
         elif arg1 == "pointer":
             CodeWriter.process_pop_pointer(arg2)
         else:
@@ -614,13 +614,13 @@ class CodeWriter:
             # Should not reach here
             assert(True)
 
-    def process_command(self, command_type, arg0, arg1, arg2):
+    def process_command(self, command_type, arg0, arg1, arg2, vm_fname):
         if command_type == CommandType.C_PUSH:
             print("Received push command")
-            CodeWriter.process_push(arg1, arg2)
+            CodeWriter.process_push(arg1, arg2, vm_fname)
         if command_type == CommandType.C_POP:
             print("Received pop command")
-            CodeWriter.process_pop(arg1, arg2)
+            CodeWriter.process_pop(arg1, arg2, vm_fname)
         if command_type == CommandType.C_ARITHEMATIC:
             print("Received arithematic/logical command")
             CodeWriter.process_arithematic(arg0)

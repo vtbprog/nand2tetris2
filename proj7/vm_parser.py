@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from vm_translator_constants import CommandType
+import os
 
 class VmParser:
     vm_file = None
@@ -8,17 +9,19 @@ class VmParser:
     command_idx = 0
     total_commmand_count = 0
 
-    def __init__(self, vm_file):
+    @staticmethod
+    def get_filename(raw_fname_str):
+        return os.path.basename(raw_fname_str).split('/')[-1]
+
+    def __init__(self):
         print("Hello from Parser init!")
-        print("VM file path is ", vm_file)
-        VmParser.vm_file = vm_file
         VmParser.command_idx = 0
         VmParser.total_command_count = 0
 
-    def parse_vm_file(self):
-        print("Reading VM file...")
+    def parse_vm_file(self, vm_file):
+        print("Reading VM file...", vm_file)
         print("VM file contains...")
-        with open(VmParser.vm_file) as file:
+        with open(vm_file) as file:
             for line in file:
                 # Filter trailing comments on any line
                 line, sep, tail = line.partition("//")
@@ -30,28 +33,32 @@ class VmParser:
                     print(line)
                     command = line.split()
                     # Add command to commands list
-                    #command = line.strip()
-                    VmParser.commands.append(command)
+                    fname = VmParser.get_filename(vm_file)
+                    VmParser.commands.append((fname, command))
                     VmParser.total_command_count += 1
 
+    def get_vm_fname(self):
+        vm_fname = VmParser.commands[VmParser.command_idx][0]
+        return vm_fname
+
     def get_arg0(self):
-        command = VmParser.commands[VmParser.command_idx]
+        command = VmParser.commands[VmParser.command_idx][1]
         return command[0]
 
     def get_arg1(self):
-        command = VmParser.commands[VmParser.command_idx]
+        command = VmParser.commands[VmParser.command_idx][1]
         if (len(command) >= 2):
             return command[1]
         return None
 
     def get_arg2(self):
-        command = VmParser.commands[VmParser.command_idx]
+        command = VmParser.commands[VmParser.command_idx][1]
         if (len(command) == 3):
             return command[2]
         return None
 
     def get_command_type(self):
-        command = VmParser.commands[VmParser.command_idx]
+        command = VmParser.commands[VmParser.command_idx][1]
         command_type = None
 
         if (command[0] == "push"):
