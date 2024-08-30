@@ -10,6 +10,9 @@ class CodeWriter:
     eq_index = 0
     gt_index = 0
     lt_index = 0
+    retaddr_count = 0
+    funclabel_count = 0
+    last_recorded_func = ""
 
     def __init__(self, asm_file):
         print("Hello from Code Writer!")
@@ -19,6 +22,9 @@ class CodeWriter:
         CodeWriter.eq_index = 0
         CodeWriter.gt_index = 0
         CodeWriter.lt_index = 0
+        CodeWriter.retaddr_count = 0
+        CodeWriter.funclabel_count = 0
+        CodeWriter.last_recorded_func = ""
 
     def __del__(self):
         print("Closing asm file ", CodeWriter.asm_file)
@@ -108,8 +114,7 @@ class CodeWriter:
         """
         file = CodeWriter.asm_fd
         file.write("// push static " + arg + "\n")
-        name = os.path.basename(vm_fname).split('.')[0]
-        file.write("@" + name + "." + arg + "\n");
+        file.write("@" + vm_fname + "." + arg + "\n");
         file.write("D=M\n")
         file.write("@SP\n")
         file.write("A=M\n")
@@ -214,12 +219,11 @@ class CodeWriter:
         """
         file = CodeWriter.asm_fd
         file.write("// pop static " + arg + "\n")
-        name = os.path.basename(vm_fname).split('.')[0]
         file.write("@SP\n")
         file.write("M=M-1\n")
         file.write("A=M\n")
         file.write("D=M\n")
-        file.write("@" + name + "." + arg + "\n");
+        file.write("@" + vm_fname + "." + arg + "\n");
         file.write("M=D\n")
 
     @staticmethod
@@ -615,20 +619,22 @@ class CodeWriter:
             assert(True)
 
     @staticmethod
-    def process_label(arg):
+    def process_label(arg, vm_fname):
         file = CodeWriter.asm_fd
         file.write("// label " + arg + "\n")
-        file.write("(" + arg + ")\n")
+        label_name = vm_fname + '.' + CodeWriter.last_recorded_func + '$' + arg
+        file.write("(" + label_name + ")\n")
 
     @staticmethod
-    def process_goto(arg):
+    def process_goto(arg, vm_fname):
         file = CodeWriter.asm_fd
         file.write("// goto " + arg + "\n")
-        file.write("@" + arg + "\n")
+        label_name = vm_fname + '.' + CodeWriter.last_recorded_func + '$' + arg
+        file.write("@" + label_name + "\n")
         file.write("0;JMP\n")
 
     @staticmethod
-    def process_if(arg):
+    def process_if(arg, vm_fname):
         """
         Pseudocode:
 
@@ -644,26 +650,275 @@ class CodeWriter:
         file.write("M=M-1\n")
         file.write("A=M\n")
         file.write("D=M\n")
-        file.write("@" + arg + "\n")
+        label_name = vm_fname + '.' + CodeWriter.last_recorded_func + '$' + arg
+        file.write("@" + label_name + "\n")
         file.write("D;JNE\n")
 
+    @staticmethod
+    def generate_retaddr(vm_fname, func_name):
+        retaddr = vm_fname + "." + func_name + "$ret." + str(CodeWriter.retaddr_count)
+        CodeWriter.retaddr_count += 1
+        return retaddr
+
+    @staticmethod
+    def process_call(arg1, arg2, vm_fname):
+        """
+        Pseudocode:
+
+        push retaddr (generate one)
+        push LCL
+        push ARG
+        push THIS
+        push THAT
+        ARG = SP-5-arg2
+        LCL = SP
+        goto arg1
+        (retaddr)
+
+        """
+        retaddr = CodeWriter.generate_retaddr(vm_fname, arg1)
+        file = CodeWriter.asm_fd
+        file.write("// call " + arg1 + " " + arg2 + "\n")
+        # push retaddr
+        file.write("@" + retaddr + "\n")
+        file.write("D=A\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+        # push LCL
+        file.write("@LCL\n")
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+        # push ARG
+        file.write("@ARG\n")
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+        # push THIS
+        file.write("@THIS\n")
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+        # push THAT
+        file.write("@THAT\n")
+        file.write("D=M\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+        # ARG = SP-5-arg2
+        file.write("@5\n")
+        file.write("D=A\n")
+        file.write("@" + arg2 + "\n")
+        file.write("D=D+A\n")
+        file.write("@SP\n")
+        file.write("D=M-D\n")
+        file.write("@ARG\n")
+        file.write("M=D\n")
+        # LCL = SP
+        file.write("@SP\n")
+        file.write("D=M\n")
+        file.write("@LCL\n")
+        file.write("M=D\n")
+        # goto arg1
+        file.write("@" + arg1 + "\n")
+        file.write("0;JMP\n")
+        # (retaddr)
+        file.write("(" + retaddr + ")\n")
+
+    @staticmethod
+    def generate_funclabel(func_name):
+        funclabel = func_name + "." + "FUNCLOOP" + str(CodeWriter.funclabel_count)
+        CodeWriter.funclabel_count += 1
+        return funclabel
+
+    @staticmethod
+    def process_function(arg1, arg2):
+        """
+        Pseudocode:
+
+        (vm_fname.arg1)
+        repeat nvars times:
+            push 0
+        """
+
+        file = CodeWriter.asm_fd
+        file.write("// function " + arg1 + " " + arg2 + "\n")
+        file.write("(" + arg1 + ")\n")
+        if (int(arg2) == 0):
+            print("No local args\n")
+            return
+        file.write("@" + arg2 + "\n")
+        file.write("D=A\n")
+        function_label = CodeWriter.generate_funclabel(arg1)
+        file.write("(" + function_label + ")\n")
+        file.write("@SP\n")
+        file.write("A=M\n")
+        file.write("M=0\n")
+        file.write("@SP\n")
+        file.write("M=M+1\n")
+        file.write("D=D-1\n")
+        file.write("@" + function_label+ "\n")
+        file.write("D;JNE\n")
+        CodeWriter.last_recorded_func = arg1
+
+    @staticmethod
+    def process_return():
+        """
+        Pseudocode:
+
+        endFrame = LCL
+        retaddr = *(endFrame - 5)
+        *ARG = pop()
+        SP = ARG + 1
+        THAT = *(endFrame - 1)
+        THIS = *(endFrame - 2)
+        ARG = *(endFrame - 3)
+        LCL = *(endFrame - 4)
+        goto retaddr
+        """
+
+        file = CodeWriter.asm_fd
+        file.write("// return\n")
+        # endFrame = LCL
+        file.write("@LCL\n")
+        file.write("D=M\n")
+        file.write("@13\n")
+        file.write("M=D\n")
+        # retaddr = *(endFrame - 5)
+        file.write("@5\n")
+        file.write("D=A\n")
+        file.write("@13\n")
+        file.write("D=M-D\n")
+        file.write("A=D\n")
+        file.write("D=M\n")
+        file.write("@14\n")
+        file.write("M=D\n")
+        # *ARG = pop()
+        file.write("@SP\n")
+        file.write("M=M-1\n")
+        file.write("A=M\n")
+        file.write("D=M\n")
+        file.write("@ARG\n")
+        file.write("A=M\n")
+        file.write("M=D\n")
+        # SP = ARG + 1
+        file.write("@ARG\n")
+        file.write("D=M\n")
+        file.write("D=D+1\n")
+        file.write("@SP\n")
+        file.write("M=D\n")
+        # THAT = *(endFrame -1)
+        file.write("@13\n")
+        file.write("D=M\n")
+        file.write("D=D-1\n")
+        file.write("A=D\n")
+        file.write("D=M\n")
+        file.write("@THAT\n")
+        file.write("M=D\n")
+        # THIS = *(endFrame -2)
+        file.write("@2\n")
+        file.write("D=A\n")
+        file.write("@13\n")
+        file.write("D=M-D\n")
+        file.write("A=D\n")
+        file.write("D=M\n")
+        file.write("@THIS\n")
+        file.write("M=D\n")
+        # ARG = *(endFrame -3)
+        file.write("@3\n")
+        file.write("D=A\n")
+        file.write("@13\n")
+        file.write("D=M-D\n")
+        file.write("A=D\n")
+        file.write("D=M\n")
+        file.write("@ARG\n")
+        file.write("M=D\n")
+        # LCL = *(endFrame -4)
+        file.write("@4\n")
+        file.write("D=A\n")
+        file.write("@13\n")
+        file.write("D=M-D\n")
+        file.write("A=D\n")
+        file.write("D=M\n")
+        file.write("@LCL\n")
+        file.write("M=D\n")
+        # goto retaddr
+        file.write("@14\n")
+        file.write("A=M\n")
+        file.write("0;JMP\n")
+
+
     def process_command(self, command_type, arg0, arg1, arg2, vm_fname):
+
+        split_vm_fname = os.path.basename(vm_fname).split('.')[0]
         if command_type == CommandType.C_PUSH:
             print("Received push command")
-            CodeWriter.process_push(arg1, arg2, vm_fname)
+            CodeWriter.process_push(arg1, arg2, split_vm_fname)
         if command_type == CommandType.C_POP:
             print("Received pop command")
-            CodeWriter.process_pop(arg1, arg2, vm_fname)
+            CodeWriter.process_pop(arg1, arg2, split_vm_fname)
         if command_type == CommandType.C_ARITHEMATIC:
             print("Received arithematic/logical command")
             CodeWriter.process_arithematic(arg0)
         if command_type == CommandType.C_LABEL:
             print("Received label command")
-            CodeWriter.process_label(arg1)
+            CodeWriter.process_label(arg1, split_vm_fname)
         if command_type == CommandType.C_GOTO:
             print("Received goto command")
-            CodeWriter.process_goto(arg1)
+            CodeWriter.process_goto(arg1, split_vm_fname)
         if command_type == CommandType.C_IF:
             print("Received if command")
-            CodeWriter.process_if(arg1)
+            CodeWriter.process_if(arg1, split_vm_fname)
+        if command_type == CommandType.C_CALL:
+            print("Received call command")
+            CodeWriter.process_call(arg1, arg2, split_vm_fname)
+        if command_type == CommandType.C_FUNCTION:
+            print("Received function command")
+            CodeWriter.process_function(arg1, arg2)
+        if command_type == CommandType.C_RETURN:
+            print("Received return command")
+            CodeWriter.process_return()
 
+    def setup_bootcode(self):
+        """
+        Pseudocode:
+
+        SP=256
+        LCL=-1
+        ARG=-2
+        THIS=-3
+        THAT=-4
+        call Sys.init 0
+        """
+        file = self.asm_fd
+        file.write("@256\n")
+        file.write("D=A\n")
+        file.write("@SP\n")
+        file.write("M=D\n")
+        file.write("@LCL\n")
+        file.write("M=-1\n")
+        file.write("D=-1\n")
+        file.write("@ARG\n")
+        file.write("D=D-1\n")
+        file.write("M=D\n")
+        file.write("@THIS\n")
+        file.write("D=D-1\n")
+        file.write("M=D\n")
+        file.write("@THAT\n")
+        file.write("D=D-1\n")
+        file.write("M=D\n")
+        CodeWriter.process_call("Sys.init", "0", "Boot")

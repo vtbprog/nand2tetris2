@@ -45,6 +45,9 @@ def main():
     # Dump commands
     my_vm_parser.dump_commands()
 
+    # Setup bootcode
+    my_code_writer.setup_bootcode()
+
     while (my_vm_parser.has_more_commands()):
 
         # Get command type

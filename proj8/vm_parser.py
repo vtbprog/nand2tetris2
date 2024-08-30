@@ -89,8 +89,12 @@ class VmParser:
             command_type = CommandType.C_GOTO
         elif (command[0] == "if-goto"):
             command_type = CommandType.C_IF
-
-        # TODO: need to implement function command types
+        elif (command[0] == "function"):
+            command_type = CommandType.C_FUNCTION
+        elif (command[0] == "return"):
+            command_type = CommandType.C_RETURN
+        elif (command[0] == "call"):
+            command_type = CommandType.C_CALL
 
         return command_type
 
